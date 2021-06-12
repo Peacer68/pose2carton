@@ -37,15 +37,10 @@ EE228 课程大作业，利用3D骨架控制3D卡通人物。
 
 
 
-<img src="..\img\origin.png" alt="image-20210613000240948" style="zoom:33%;" /><img src="..\img\783.png" alt="image-20210612235052945" style="zoom:33%;" /><img src="..\img\7466.png" alt="image-20210612235114459" style="zoom:33%;" /><img src="..\img\7506.png" alt="image-20210612235214865" style="zoom:33%;" />
-
-<img src="..\img\7550.png" alt="image-20210612235320532" style="zoom:33%;" /><img src="..\img\9467.png" alt="image-20210612235439197" style="zoom:33%;" /><img src="..\img\9484.png" alt="image-20210612235533131" style="zoom:33%;" /><img src="..\img\9875.png" alt="image-20210612235615049" style="zoom:33%;" />
-
-<img src="..\img\11950.png" alt="image-20210612235706962" style="zoom: 33%;" /><img src="..\img\12057.png" alt="image-20210612235809796" style="zoom:33%;" /><img src="..\img\18996.png" alt="image-20210612235957012" style="zoom:33%;" /><img src="..\img\online1.png" alt="image-20210613000539241" style="zoom:33%;" />
-
-
-
-<img src="..\img\online2.png" alt="image-20210613000625579" style="zoom:33%;" /><img src="..\img\online3.png" alt="image-20210613000717087" style="zoom:33%;" /><img src="..\img\online4.png" alt="image-20210613000753725" style="zoom:33%;" /><img src="..\img\online5.png" alt="image-20210613000837096" style="zoom:33%;" />
+![image](img/1.png)
+![image](img/2.png)
+![image](img/3.png)
+![image](img/4.png)
 
 
 
