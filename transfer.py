@@ -17,9 +17,6 @@ from tqdm import tqdm
 from obj_loader import TriangleMesh
 
 
-# ***** 需要你补充的变量) ******
-manual_model_to_smpl = {}
-#(e.g.) manual_model_to_smpl = {0: 0, 1: 3, 2: 2, 3: 1, 4: 6, 5: 5, 6: 4, 7: 9, 8: 8, 9: 7, 10: 12, 11: 14, 12: 13, 21: 19, 22: 18, 23: 21, 24: 20, 16: 17, 17: 16}
 
 smpl_joint_names = [
     "hips", 
@@ -44,9 +41,10 @@ smpl_joint_names = [
     "rightForeArm", 
     "leftHand", 
     "rightHand", 
-    "leftHandIndex1"
+    "leftHandIndex1",
     "rightHandIndex1", 
 ]
+
 
 def _lazy_get_model_to_smpl(_index2joint): 
     """
@@ -144,7 +142,7 @@ def rodrigues(r):
     R = cos * i_cube + (1 - cos) * dot + np.sin(theta) * m
     return R
 
-def transfer_given_pose(human_pose, infoname, is_root_rotated=False): 
+def transfer_given_pose(human_pose, infoname, is_root_rotated=False, test=False): 
     """
     core function of human transfer, given human pose(24 x 3, rotation vectors), character rig info(.txt), character T-posed mesh(.obj), perform transfer 
     firstly parse rig info file and obtain the mapping from joint name to joint index and construct the kinematic chain
@@ -215,10 +213,13 @@ def transfer_given_pose(human_pose, infoname, is_root_rotated=False):
                 new_hier[new_joint2index[index2joint[item]]] = []
             new_hier[new_joint2index[index2joint[item]]].append(new_joint2index[child_name])
             top_level.append(child)
-    print('joint names and their indices in the 3d character model')
-    print(new_joint2index)
-    print('kinetree table(kinematics connectivity) in the 3d character model')
-    print(new_hier)
+    if test:
+        for i in range(len(smpl_joint_names)):
+            print(i,": ",smpl_joint_names[i])
+        print('joint names and their indices in the 3d character model')
+        print(new_joint2index)
+    # print('kinetree table(kinematics connectivity) in the 3d character model')
+    # print(new_hier)
     new_index2joint = {index: joint for joint, index in new_joint2index.items()}
     kinetree_table = [[-1, 0]]
     for k, v in new_hier.items(): 
@@ -267,7 +268,7 @@ def transfer_given_pose(human_pose, infoname, is_root_rotated=False):
     }
 
     poses = np.zeros((1, num_joints, 3), dtype=np.float32)
-    lazy_model_to_smpl = _lazy_get_model_to_smpl(new_index2joint)
+    # lazy_model_to_smpl = _lazy_get_model_to_smpl(new_index2joint)
     # if len(lazy_model_to_smpl) < 19:
     #     print("Please set mapping manually")
     #     return None, None
@@ -277,9 +278,10 @@ def transfer_given_pose(human_pose, infoname, is_root_rotated=False):
     #     warn_info = "Lazy mapper can only map {} joints between 3D model and SMPL, you may map manually".format(len(lazy_model_to_smpl))
     #     print(warn_info)
     # print("lazy mapper and manual mapper obtains {}/{} joints respectively, choose the larger one".format(len(lazy_model_to_smpl), len(manual_model_to_smpl)))
-    model_to_smpl = lazy_model_to_smpl if len(lazy_model_to_smpl) > len(manual_model_to_smpl) else manual_model_to_smpl
+    # model_to_smpl = lazy_model_to_smpl if len(lazy_model_to_smpl) > len(manual_model_to_smpl) else manual_model_to_smpl
 
-    # model_to_smpl = manual_model_to_smpl
+    model_to_smpl = manual_model_to_smpl
+    # print(model_to_smpl)
     # ******* You need to perform mapping for at least 10 joints, otherwise you will receive this assertion ******
     assert len(model_to_smpl) >= 10, "Please map manually and ensure that at least 10 joints are matched"
 
@@ -327,16 +329,16 @@ def transfer_given_pose(human_pose, infoname, is_root_rotated=False):
     outmesh.vertices = o3d.utility.Vector3dVector(v)
 
     # finally save the results for submission. Note that the logic here only saves connectivity. You still need to run vis.py to record visualization 
-    # if not osp.exists(osp.join("results", infoname.replace(".txt", ".pkl").replace('/', '_'))): 
-    os.makedirs("./results", exist_ok=True)
-    save_dict = {
-        "infoname": infoname, 
-        "hier": new_hier, 
-        "name2index": new_joint2index, 
-        "model2smpl": model_to_smpl
-    }
-    with open(osp.join("results", str(infoname).replace(".txt", ".pkl").replace('/', '_')), "wb") as f: 
-        pkl.dump(save_dict, f)
+    if not osp.exists(osp.join("results", infoname.replace(".txt", ".pkl").replace('/', '_'))): 
+        os.makedirs("./results", exist_ok=True)
+        save_dict = {
+            "infoname": infoname, 
+            "hier": new_hier, 
+            "name2index": new_joint2index, 
+            "model2smpl": model_to_smpl
+        }
+        with open(osp.join("results", str(infoname).replace(".txt", ".pkl").replace('/', '_')), "wb") as f: 
+            pkl.dump(save_dict, f)
 
     return outinfo, outmesh
 
@@ -345,7 +347,7 @@ def transfer_one_frame(infofile, use_online_model=False):
     transfer human pose in one frame to 3D character
     infofile: riginfo file for one specific character model
     """
-    np.random.seed(2021)
+    np.random.seed(2020)
     # randomly sample one frame and obtain its pose
     with open("./pose_sample.pkl", "rb") as f: 
         # poses shape: (N, 24, 3)
@@ -377,16 +379,16 @@ def transfer_one_frame(infofile, use_online_model=False):
                     fp.write('f %d %d %d\n' % (f[0], f[1], f[2]))
         print('transferred finished, save to {} and {} with reference to human pose {}.obj'.format(out_infofile, out_objfile, random_index))
 
-def transfer_one_sequence(infofile, seqfile, use_online_model=False): 
+def transfer_one_sequence(infofile, seqfile, use_online_model=False, test=False): 
     """
     transfer one sequence of human poses to 3D characters
     infofile: riginfo file for one specific character model 
     seqfile: sequence file that contains the sequential human pose
     """
-    np.random.seed(2021)
+    # np.random.seed(2021)
     with open(seqfile, "rb") as f: 
         human_poses = pkl.load(f)['pose']
-    savedir = seqfile.replace("info", "obj").split('.')[0] + '_3dmodel'
+    savedir = seqfile.replace("info", "obj").split('.')[0] + '_fbx' + infofile.split('.')[0].split('/')[1] + '_3dmodel'
     os.makedirs(savedir, exist_ok=True)
     if use_online_model:
         extra_uv_lines = _get_extra_uv_lines(infofile) 
@@ -404,7 +406,9 @@ def transfer_one_sequence(infofile, seqfile, use_online_model=False):
     tbar = tqdm(range(len(human_poses)))
     for idx in tbar: 
         human_pose = human_poses[idx]
-        outinfo, outmesh = transfer_given_pose(human_pose, infofile, is_root_rotated=True)
+        outinfo, outmesh = transfer_given_pose(human_pose, infofile, is_root_rotated=True, test=test)
+        # print("--------------------------------------------------------")
+        # print(outmesh)
         if outinfo is not None: 
             out_infofile = osp.join(savedir, f"{idx}.txt")
             out_objfile = out_infofile.replace(".txt", '.obj')
@@ -455,6 +459,43 @@ def save_fbx(info_files):
         print('save to', info_file.replace(".txt", ".fbx"))
 
 if __name__ == '__main__':
+        # ***** 需要你补充的变量) ******
+    # manual_model_to_smpl = {0:0,1:2,2:1,3:3,4:5,5:4,12:19,8:15,16:18,10:8,11:7,17:21,21:20,7:17,9:16} # for 191.obj no
+    manual_model_to_smpl = {0:0,1:1,3:2,4:4,8:5,2:3,5:14,6:13,7:12,9:7,12:8,13:19,14:18,10:17,11:16,15:21,16:20} # for 783.obj yes
+    # manual_model_to_smpl = {0:0,1:1,2:2,3:3,4:4,5:5,6:15,8:17,12:16,13:7,14:8,16:19,17:18} # for 1238.obj no
+    # manual_model_to_smpl = {0:0,1:1,2:14,3:2,4:13,5:15,6:4,7:17,8:5,9:16,10:12,12:7,13:19,14:8,15:18,16:21,17:20} # for 2013.obj no
+    # manual_model_to_smpl = {0:0,1:15,2:1,3:16,4:17,5:2,7:4,8:18,9:19,10:5,11:7,12:20,13:21,14:8} # for 6811.obj no
+    # manual_model_to_smpl = {0:0,1:3,2:1,3:2,4:6,5:4,6:5,7:9,8:7,9:8,10:12,11:10,12:11,14:15,16:16,18:17,19:18,21:19,22:20,23:21} # for 1418.obj no
+    # manual_model_to_smpl = {0:0,1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:16,10:17,11:12,12:18,13:19,14:15,15:20,16:21} # for 7466.obj yes
+    # manual_model_to_smpl = {0:0,1:1,2:3,3:2,8:4,9:6,10:5,11:7,12:14,13:12,14:13,15:8,16:10,20:11,17:17,18:15,19:16,21:19,25:18,26:21,27:20} # for 7506.obj yes
+    # manual_model_to_smpl = {0:0,1:1,2:3,3:2,4:4,5:6,6:5,7:7,8:12,9:13,10:14,11:8,12:10,13:15,14:16,15:17,16:11,19:18,20:19,22:20,23:21} # for 7550.obj yes
+    # manual_model_to_smpl = {0:0,1:1,2:3,3:2,4:4,5:15,6:16,7:17,8:5,9:7,10:18,11:19,12:8,13:20,14:21,15:22,16:23} # for 8249.obj 1 no 
+    # manual_model_to_smpl = {0:0,1:1,2:2,3:3,4:4,5:5,6:17,7:15,8:16,9:7,10:8,11:19,15:18,16:10,17:11,18:21,22:20} # for 8297.obj 1 no
+    # manual_model_to_smpl = {0:0,1:3,2:2,3:1,4:16,5:12,6:17,7:5,8:4,9:18,10:19,11:8,12:7,13:20,14:21} # for 8335.obj 1 no
+
+    # manual_model_to_smpl = {0:0,2:3,3:2,4:1,5:12,6:13,7:14,8:5,9:4,10:16,11:17,12:8,13:7,14:18,15:19,16:20,17:21} # for 9467.obj yes
+    # manual_model_to_smpl = {0:0,2:3,3:2,4:1,5:12,6:13,7:14,8:5,9:4,10:16,11:17,12:8,13:7,14:18,15:19,16:20,17:21} # for 9484.obj yes
+    # manual_model_to_smpl = {0:0,1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:16,10:17,11:12,12:18,13:19,14:15,15:20,16:21} # for 9875.obj yes
+    # manual_model_to_smpl = {0:3,1:13,2:15,3:1,4:14,5:2,6:18,9:4,10:19,11:5,12:21,14:7,15:20,16:8} # for 10450.obj no
+    # manual_model_to_smpl = {0:0,1:1,2:3,3:2,4:4,5:6,6:5,7:7,8:12,9:13,10:14,11:8,12:15,13:16,14:17,18:18,19:19,20:20,21:21} # for 11950.obj yes
+    # manual_model_to_smpl = {0:0,1:3,2:2,3:1,5:15,6:17,7:16,8:5,9:4,15:19,16:18,20:21,21:20,22:8,23:7} # for 12057.obj yes
+    # manual_model_to_smpl = {0:0,1:3,2:6,3:1,4:2,6:15,7:17,8:16,9:4,10:5,15:19,16:18,17:7,18:8,19:21,20:20} # for 17279.obj no
+    # manual_model_to_smpl = {0:0,1:1,3:2,4:3,5:4,8:5,9:15,10:16,12:17,13:7,16:8,18:18,19:19,20:10,21:8,22:20,23:21} # for 17703.obj no
+
+    # manual_model_to_smpl = {0:0,1:1,2:2,3:3,4:4,5:5,6:17,7:15,8:16,9:7,10:8,11:19,13:18,14:21,16:20} # for 18996.obj yes
+
+    # manual_model_to_smpl = {0:0,1:3,2:1,3:2,4:6,5:4,6:5,7:9,8:7,9:8,10:12,11:13,12:14,13:10,14:11,15:15,16:16,17:17,21:18,22:19,23:20,\
+    #     24:21,26:22,30:23} # for kachujin.obj yes
+
+    # manual_model_to_smpl = {0:0,1:3,2:2,3:1,4:6,5:4,6:4,7:9,8:8,9:7,10:12,11:14,12:13,13:11,14:10,15:15,16:17,17:16,21:19,22:18,23:21,\
+        # 24:20,26:23,30:22} # for b.obj yes
+
+    # manual_model_to_smpl = { 0:0,1:3,2:2,3:1,4:6,5:5,6:4, 7:9,8:8,9:7,10:12,11:14,12:13,13:11,14:10,15:15,16:17,17:16,21:19,22:18,23:21,\
+    #     24:20,26:23,31:22} # for cartoon man
+
+    # manual_model_to_smpl = {} # for mapping
+    #(e.g.) manual_model_to_smpl = {0: 0, 1: 3, 2: 2, 3: 1, 4: 6, 5: 5, 6: 4, 7: 9, 8: 8, 9: 7, 10: 12, 11: 14, 12: 13, 21: 19, 22: 18, 23: 21, 24: 20, 16: 17, 17: 16}
+
     # use fbx parser to paser fbx into obj, rig info (mayapy needed, you need to install and configure maya first)
     # parse_fbx("fbx")
     
@@ -464,9 +505,10 @@ if __name__ == '__main__':
 
     # for provided models
     # transfer_one_frame("fbx/10559.txt")
-    # transfer_one_sequence("fbx/10559.txt", "info_seq_5.pkl")
+    transfer_one_sequence("fbx/783.txt", "info_seq_5.pkl", use_online_model=0, test=1)
 
     # for possible model downloaded online
-    # clean_info("samples/Ch14_nonPBR.txt")
-    transfer_one_frame("samples/Ch14_nonPBR.txt", use_online_model=True)
+    # clean_info("online_model/b.txt")
+    # transfer_one_frame("online2/CartoonMan011.txt", use_online_model=True)
+    # print(_get_extra_uv_lines("online_model/a.txt"))
     # transfer_one_sequence("samples/Ch14_nonPBR.txt", "info_seq_5.pkl", use_online_model=True)

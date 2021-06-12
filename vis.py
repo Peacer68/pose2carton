@@ -10,6 +10,9 @@ import numpy as np
 import cv2
 import open3d as o3d 
 from tqdm import tqdm
+import warnings
+
+warnings.filterwarnings('ignore')
 
 use_online_model = False
 if not use_online_model and int(o3d.__version__.split('.')[1]) < 11:
